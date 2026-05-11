@@ -339,44 +339,6 @@ Output: Predicted Close Price (next day)
 
 ---
 
-## 👥 Team
-
-<table>
-  <tr>
-    <td align="center" width="25%">
-      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=ArjunSharma&backgroundColor=0a1c30&style=circle" width="80" height="80" style="border-radius:50%;border:2px solid #38bdf8"/>
-      <br/><strong>Arjun Sharma</strong>
-      <br/><sub>Lead ML Engineer</sub>
-      <br/><sub>📍 Bangalore, India</sub>
-      <br/>
-      <a href="https://github.com/arjunsharma"><img src="https://img.shields.io/badge/GitHub-arjunsharma-38bdf8?style=flat-square&logo=github" alt="GitHub"/></a>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=PriyaPatel&backgroundColor=0a1c30&style=circle" width="80" height="80" style="border-radius:50%;border:2px solid #c084fc"/>
-      <br/><strong>Priya Patel</strong>
-      <br/><sub>Full-Stack Engineer</sub>
-      <br/><sub>📍 Mumbai, India</sub>
-      <br/>
-      <a href="https://github.com/priyapatel"><img src="https://img.shields.io/badge/GitHub-priyapatel-c084fc?style=flat-square&logo=github" alt="GitHub"/></a>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=RahulNair&backgroundColor=0a1c30&style=circle" width="80" height="80" style="border-radius:50%;border:2px solid #4ade80"/>
-      <br/><strong>Rahul Nair</strong>
-      <br/><sub>Data Scientist</sub>
-      <br/><sub>📍 Hyderabad, India</sub>
-      <br/>
-      <a href="https://github.com/rahulnair"><img src="https://img.shields.io/badge/GitHub-rahulnair-4ade80?style=flat-square&logo=github" alt="GitHub"/></a>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=SnehaIyer&backgroundColor=0a1c30&style=circle" width="80" height="80" style="border-radius:50%;border:2px solid #fcd34d"/>
-      <br/><strong>Sneha Iyer</strong>
-      <br/><sub>UI/UX Designer</sub>
-      <br/><sub>📍 Chennai, India</sub>
-      <br/>
-      <a href="https://github.com/snehaiyer"><img src="https://img.shields.io/badge/GitHub-snehaiyer-fcd34d?style=flat-square&logo=github" alt="GitHub"/></a>
-    </td>
-  </tr>
-</table>
 
 ---
 
