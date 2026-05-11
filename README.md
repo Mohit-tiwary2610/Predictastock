@@ -32,7 +32,7 @@
 
 ---
 
-### 🌐 [Live Demo](https://stockseer.ai) &nbsp;·&nbsp; 📖 [Documentation](https://docs.stockseer.ai) &nbsp;·&nbsp; 🐛 [Report Bug](https://github.com/stockseer-ai/stockseer/issues) &nbsp;·&nbsp; ✨ [Request Feature](https://github.com/stockseer-ai/stockseer/issues)
+### 🌐 [Live Demo](https://predictastock.netlify.app) &nbsp;·&nbsp; 📖 [Documentation](https://predictastock.netlify.app/about) &nbsp;·&nbsp; 🐛 [Report Bug](https://github.com/Mohit-tiwary2610/Predictastock/main/TROUBLESHOOTING.md)
 
 </div>
 
