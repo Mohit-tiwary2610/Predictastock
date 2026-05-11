@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+.env
+*.keras
+*.h5
+saved_models/
+
+# Node / React
+node_modules/
+build/
+.DS_Store
+*.log
+npm-debug.log*
+
+# Data files
+*.csv
+*.pkl
+*.npz
+
+# IDE
+.vscode/
+.idea/
+*.swp

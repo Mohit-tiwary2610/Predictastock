@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  # ── Flask API ───────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lstm_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - DEBUG=False
+      - PORT=5000
+      - HOST=0.0.0.0
+      - SECRET_KEY=change-this-in-production-please
+    volumes:
+      - ./backend/saved_models:/app/saved_models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── React Frontend ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lstm_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: lstm_network
