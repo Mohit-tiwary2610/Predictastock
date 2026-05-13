@@ -9,9 +9,6 @@ class Config:
     PORT = int(os.getenv("PORT", 5000))
     HOST = os.getenv("HOST", "0.0.0.0")
 
-    # Finnhub API Key
-    FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
-
     # LSTM Model Configuration
     SEQUENCE_LENGTH = 60
     PREDICTION_DAYS = 30

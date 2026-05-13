@@ -1,109 +1,89 @@
-import finnhub # type: ignore
+import yfinance as yf # type: ignore
 import pandas as pd # type: ignore
 import numpy as np # type: ignore
 from datetime import datetime, timedelta
 import time
 import random
-import os
 from threading import Lock
 
-# Rate limiter - max 60 req/min for Finnhub free tier
 _api_lock = Lock()
-_last_request_time = 0
-_min_interval = 1.0  # 1 second between requests
-
-def get_finnhub_client():
-    from config import Config
-    return finnhub.Client(api_key=Config.FINNHUB_API_KEY)
 
 
-def rate_limited_call(fn, *args, **kwargs):
-    """Ensure minimum interval between API calls."""
-    global _last_request_time
-    with _api_lock:
-        now = time.time()
-        elapsed = now - _last_request_time
-        if elapsed < _min_interval:
-            time.sleep(_min_interval - elapsed)
-        result = fn(*args, **kwargs)
-        _last_request_time = time.time()
-        return result
+def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
+    """Fetch stock data with exponential backoff retry logic."""
+    ticker = None
+    for attempt in range(max_retries):
+        try:
+            wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+            time.sleep(wait_time)
+
+            ticker = yf.Ticker(symbol.upper())
+            df = ticker.history(period=period, interval=interval)
+
+            if df is not None and not df.empty:
+                print(f"[SUCCESS] Fetched {symbol} on attempt {attempt + 1}")
+                return df, ticker
+
+            print(f"[WARN] Empty data for {symbol}, attempt {attempt + 1}")
+
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "too many requests" in error_msg or "rate limit" in error_msg:
+                wait = (2 ** attempt) * 3 + random.uniform(1, 3)
+                print(f"[RATE LIMIT] {symbol} attempt {attempt + 1}, waiting {wait:.1f}s")
+                time.sleep(wait)
+            else:
+                print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
+
+    return pd.DataFrame(), ticker
 
 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
     """
-    Fetch historical stock data from Finnhub.
+    Fetch historical stock data from Yahoo Finance.
     Returns dict with OHLCV data + technical indicators.
     """
     try:
-        client = get_finnhub_client()
-        symbol = symbol.upper()
+        with _api_lock:
+            df, ticker = fetch_with_retry(symbol, period, interval)
 
-        # Calculate date range from period
-        end = datetime.now()
-        period_map = {
-            "1d": 1, "5d": 5, "1mo": 30, "3mo": 90,
-            "6mo": 180, "1y": 365, "2y": 730, "5y": 1825
-        }
-        days = period_map.get(period, 730)
-        start = end - timedelta(days=days)
+        print(f"[DEBUG] fetch_stock_data: {symbol}, period={period}, interval={interval}, rows={len(df)}")
 
-        start_ts = int(start.timestamp())
-        end_ts = int(end.timestamp())
-
-        print(f"[DEBUG] Fetching {symbol} from Finnhub, period={period}")
-
-        # Fetch candle data
-        res = rate_limited_call(
-            client.stock_candles,
-            symbol, "D", start_ts, end_ts
-        )
-
-        if res.get("s") != "ok" or not res.get("c"):
+        if df is None or df.empty:
             return {"success": False, "error": f"No data found for symbol '{symbol}'"}
 
-        # Build DataFrame
-        df = pd.DataFrame({
-            "Date":   pd.to_datetime(res["t"], unit="s"),
-            "Open":   res["o"],
-            "High":   res["h"],
-            "Low":    res["l"],
-            "Close":  res["c"],
-            "Volume": res["v"],
-        })
+        df = df.reset_index()
+        df.columns = [c.replace(" ", "_") for c in df.columns]
 
-        print(f"[DEBUG] Got {len(df)} rows for {symbol}")
-
-        # Add technical indicators
         df = add_technical_indicators(df)
 
-        # Get company info
         info = {}
         try:
-            profile = rate_limited_call(client.company_profile2, symbol=symbol)
-            quote = rate_limited_call(client.quote, symbol)
-            metrics = rate_limited_call(client.company_basic_financials, symbol, "all")
-
+            raw_info = ticker.info
             info = {
-                "name":                profile.get("name", symbol),
-                "sector":              profile.get("finnhubIndustry", "N/A"),
-                "industry":            profile.get("finnhubIndustry", "N/A"),
-                "market_cap":          profile.get("marketCapitalization", 0) * 1_000_000,
-                "pe_ratio":            metrics.get("metric", {}).get("peNormalizedAnnual", 0),
-                "fifty_two_week_high": metrics.get("metric", {}).get("52WeekHigh", 0),
-                "fifty_two_week_low":  metrics.get("metric", {}).get("52WeekLow", 0),
-                "avg_volume":          metrics.get("metric", {}).get("10DayAverageTradingVolume", 0),
-                "currency":            profile.get("currency", "USD"),
+                "name":                raw_info.get("longName", symbol),
+                "sector":              raw_info.get("sector", "N/A"),
+                "industry":            raw_info.get("industry", "N/A"),
+                "market_cap":          raw_info.get("marketCap", 0),
+                "pe_ratio":            raw_info.get("trailingPE", 0),
+                "fifty_two_week_high": raw_info.get("fiftyTwoWeekHigh", 0),
+                "fifty_two_week_low":  raw_info.get("fiftyTwoWeekLow", 0),
+                "avg_volume":          raw_info.get("averageVolume", 0),
+                "currency":            raw_info.get("currency", "USD"),
             }
         except Exception as e:
             print(f"[WARN] Could not fetch company info for {symbol}: {e}")
             info = {"name": symbol}
 
-        # Prepare historical data
         historical = []
         for _, row in df.iterrows():
             try:
-                date_str = row["Date"].strftime("%Y-%m-%d")
+                date_val = row["Date"]
+                if hasattr(date_val, "strftime"):
+                    date_str = date_val.strftime("%Y-%m-%d")
+                else:
+                    date_str = str(date_val)[:10]
+
                 historical.append({
                     "date":   date_str,
                     "open":   round(float(row["Open"]),  2),
@@ -126,7 +106,7 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
 
         return {
             "success":          True,
-            "symbol":           symbol,
+            "symbol":           symbol.upper(),
             "info":             info,
             "current_price":    round(last_close, 2),
             "price_change":     round(price_change, 2),
@@ -177,27 +157,10 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
 def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
     """Return raw DataFrame for ML training."""
     try:
-        client = get_finnhub_client()
-        symbol = symbol.upper()
-        end = datetime.now()
-        start = end - timedelta(days=730)
-        res = rate_limited_call(
-            client.stock_candles,
-            symbol, "D",
-            int(start.timestamp()),
-            int(end.timestamp())
-        )
-        if res.get("s") != "ok":
-            return pd.DataFrame()
-
-        df = pd.DataFrame({
-            "Date":   pd.to_datetime(res["t"], unit="s"),
-            "Open":   res["o"],
-            "High":   res["h"],
-            "Low":    res["l"],
-            "Close":  res["c"],
-            "Volume": res["v"],
-        })
+        ticker = yf.Ticker(symbol.upper())
+        df = ticker.history(period=period, interval="1d")
+        df = df.reset_index()
+        df.columns = [c.replace(" ", "_") for c in df.columns]
         return df
     except Exception as e:
         print(f"Error fetching raw data: {e}")
@@ -205,18 +168,16 @@ def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
 
 
 def search_stock(query: str) -> list:
-    """Search stock symbols using Finnhub."""
+    """Simple stock symbol search."""
     try:
-        client = get_finnhub_client()
-        results = rate_limited_call(client.symbol_lookup, query)
-        matches = []
-        for item in results.get("result", [])[:5]:
-            if item.get("type") == "Common Stock":
-                matches.append({
-                    "symbol":   item.get("symbol", ""),
-                    "name":     item.get("description", query),
-                    "exchange": item.get("primaryExchange", ""),
-                })
-        return matches
+        ticker = yf.Ticker(query.upper())
+        info = ticker.info
+        if info and info.get("symbol"):
+            return [{
+                "symbol":   info["symbol"],
+                "name":     info.get("longName", query),
+                "exchange": info.get("exchange", ""),
+            }]
+        return []
     except Exception:
         return []
