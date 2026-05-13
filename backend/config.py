@@ -9,6 +9,10 @@ class Config:
     PORT = int(os.getenv("PORT", 5000))
     HOST = os.getenv("HOST", "0.0.0.0")
 
+    # Finnhub API Key
+    FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+
+    # LSTM Model Configuration
     SEQUENCE_LENGTH = 60
     PREDICTION_DAYS = 30
     EPOCHS = 50
@@ -20,6 +24,7 @@ class Config:
     VALIDATION_SPLIT = 0.1
     LEARNING_RATE = 0.001
 
+    # Data Configuration
     DEFAULT_PERIOD = "2y"
     DEFAULT_INTERVAL = "1d"
     FEATURE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
