@@ -22,7 +22,7 @@ def get_stock_data(symbol):
 
         # Check cache first
         cache = get_cache()
-        cache_key = f"stock_data_{symbol}_{period}_{interval}"
+        cache_key = f"stock_data_{symbol.upper()}_{period}_{interval}"
         if cache:
             cached = cache.get(cache_key)
             if cached:
@@ -30,8 +30,6 @@ def get_stock_data(symbol):
                 return jsonify(cached), 200
 
         print(f"[DEBUG] Fetching fresh: symbol={symbol}, period={period}, interval={interval}")
-
-        # Add small delay to avoid rate limiting
         time.sleep(random.uniform(0.5, 1.5))
 
         result = fetch_stock_data(symbol, period=period, interval=interval)
@@ -39,9 +37,8 @@ def get_stock_data(symbol):
         if not result.get("success"):
             return jsonify(result), 404
 
-        # Store in cache
         if cache:
-            cache.set(cache_key, result, timeout=600)  # 10 min
+            cache.set(cache_key, result, timeout=600)
             print(f"[CACHE SET] {cache_key}")
 
         return jsonify(result), 200
@@ -72,9 +69,9 @@ def get_popular_stocks():
                 return jsonify(cached), 200
 
         stocks = []
-        for s in Config.POPULAR_STOCKS:
-            # Add delay between each stock fetch
-            time.sleep(random.uniform(0.5, 1.0))
+        # Only fetch 5 stocks with bigger delay to avoid rate limiting
+        for s in Config.POPULAR_STOCKS[:5]:
+            time.sleep(random.uniform(1.5, 2.5))
             result = fetch_stock_data(s["symbol"], period="5d")
             stocks.append({
                 "symbol":           s["symbol"],
@@ -86,7 +83,6 @@ def get_popular_stocks():
 
         response = {"success": True, "stocks": stocks}
 
-        # Cache for 5 minutes
         if cache:
             cache.set(cache_key, response, timeout=300)
             print(f"[CACHE SET] {cache_key}")
@@ -112,7 +108,6 @@ def search_stocks():
         if not query:
             return jsonify({"success": False, "error": "Query parameter 'q' required"}), 400
 
-        # Check cache
         cache = get_cache()
         cache_key = f"search_{query.upper()}"
         if cache:
@@ -141,7 +136,6 @@ def get_stock_info(symbol):
     try:
         from utils.data_fetcher import fetch_stock_data
 
-        # Check cache
         cache = get_cache()
         cache_key = f"stock_info_{symbol.upper()}"
         if cache:
