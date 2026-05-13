@@ -2,12 +2,22 @@ from flask import Blueprint, jsonify, request, current_app # type: ignore
 import traceback
 import time
 import random
+from threading import Lock
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/api/stock")
+
+# Global request lock to queue requests one at a time
+_request_lock = Lock()
 
 
 def get_cache():
     return getattr(current_app, 'cache', None)
+
+
+def locked_fetch(fetch_fn, *args, **kwargs):
+    """Queue requests using a lock to prevent simultaneous Yahoo Finance calls."""
+    with _request_lock:
+        return fetch_fn(*args, **kwargs)
 
 
 @stock_bp.route("/data/<symbol>", methods=["GET"])
@@ -20,7 +30,6 @@ def get_stock_data(symbol):
         period = request.args.get("period") or Config.DEFAULT_PERIOD
         interval = request.args.get("interval") or Config.DEFAULT_INTERVAL
 
-        # Check cache first
         cache = get_cache()
         cache_key = f"stock_data_{symbol.upper()}_{period}_{interval}"
         if cache:
@@ -29,27 +38,21 @@ def get_stock_data(symbol):
                 print(f"[CACHE HIT] {cache_key}")
                 return jsonify(cached), 200
 
-        print(f"[DEBUG] Fetching fresh: symbol={symbol}, period={period}, interval={interval}")
-        time.sleep(random.uniform(0.5, 1.5))
-
-        result = fetch_stock_data(symbol, period=period, interval=interval)
+        print(f"[FETCH] Fresh data: {symbol}")
+        result = locked_fetch(fetch_stock_data, symbol, period=period, interval=interval)
 
         if not result.get("success"):
             return jsonify(result), 404
 
         if cache:
             cache.set(cache_key, result, timeout=600)
-            print(f"[CACHE SET] {cache_key}")
 
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"[ERROR] Exception in get_stock_data: {str(e)}")
+        print(f"[ERROR] {str(e)}")
         traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": f"Internal error: {str(e)}",
-        }), 500
+        return jsonify({"success": False, "error": f"Internal error: {str(e)}"}), 500
 
 
 @stock_bp.route("/popular", methods=["GET"])
@@ -59,7 +62,6 @@ def get_popular_stocks():
         from utils.data_fetcher import fetch_stock_data
         from config import Config
 
-        # Check cache first
         cache = get_cache()
         cache_key = "popular_stocks"
         if cache:
@@ -69,10 +71,9 @@ def get_popular_stocks():
                 return jsonify(cached), 200
 
         stocks = []
-        # Only fetch 5 stocks with bigger delay to avoid rate limiting
-        for s in Config.POPULAR_STOCKS[:5]:
-            time.sleep(random.uniform(1.5, 2.5))
-            result = fetch_stock_data(s["symbol"], period="5d")
+        for s in Config.POPULAR_STOCKS:
+            # Queue each request one at a time
+            result = locked_fetch(fetch_stock_data, s["symbol"], period="5d")
             stocks.append({
                 "symbol":           s["symbol"],
                 "name":             s["name"],
@@ -85,17 +86,13 @@ def get_popular_stocks():
 
         if cache:
             cache.set(cache_key, response, timeout=300)
-            print(f"[CACHE SET] {cache_key}")
 
         return jsonify(response), 200
 
     except Exception as e:
-        print(f"[ERROR] Exception in get_popular_stocks: {str(e)}")
+        print(f"[ERROR] {str(e)}")
         traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": f"Internal error: {str(e)}"
-        }), 500
+        return jsonify({"success": False, "error": f"Internal error: {str(e)}"}), 500
 
 
 @stock_bp.route("/search", methods=["GET"])
@@ -113,11 +110,9 @@ def search_stocks():
         if cache:
             cached = cache.get(cache_key)
             if cached:
-                print(f"[CACHE HIT] {cache_key}")
                 return jsonify(cached), 200
 
-        time.sleep(random.uniform(0.3, 0.8))
-        results = search_stock(query)
+        results = locked_fetch(search_stock, query)
         response = {"success": True, "results": results}
 
         if cache:
@@ -126,7 +121,6 @@ def search_stocks():
         return jsonify(response), 200
 
     except Exception as e:
-        print(f"[ERROR] Exception in search_stocks: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -141,11 +135,9 @@ def get_stock_info(symbol):
         if cache:
             cached = cache.get(cache_key)
             if cached:
-                print(f"[CACHE HIT] {cache_key}")
                 return jsonify(cached), 200
 
-        time.sleep(random.uniform(0.3, 0.8))
-        result = fetch_stock_data(symbol, period="5d")
+        result = locked_fetch(fetch_stock_data, symbol, period="5d")
 
         if not result.get("success"):
             return jsonify(result), 404
@@ -165,11 +157,9 @@ def get_stock_info(symbol):
         return jsonify(response), 200
 
     except Exception as e:
-        print(f"[ERROR] Exception in get_stock_info: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 @stock_bp.route("/test", methods=["GET"])
 def test_endpoint():
-    """Test endpoint to verify routing works"""
     return jsonify({"success": True, "message": "Stock routes are working!"}), 200

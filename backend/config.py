@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv # pyright: ignore[reportMissingImports]
+from dotenv import load_dotenv # type: ignore
 
 load_dotenv()
 
@@ -9,7 +9,6 @@ class Config:
     PORT = int(os.getenv("PORT", 5000))
     HOST = os.getenv("HOST", "0.0.0.0")
 
-    # LSTM Model Configuration
     SEQUENCE_LENGTH = 60
     PREDICTION_DAYS = 30
     EPOCHS = 50
@@ -21,21 +20,24 @@ class Config:
     VALIDATION_SPLIT = 0.1
     LEARNING_RATE = 0.001
 
-    # Data Configuration
     DEFAULT_PERIOD = "2y"
     DEFAULT_INTERVAL = "1d"
     FEATURE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
     TARGET_COLUMN = "Close"
 
-    # Popular Stock Tickers (reduced to 5 to avoid rate limiting)
+    # All 10 popular stocks
     POPULAR_STOCKS = [
-        {"symbol": "AAPL", "name": "Apple Inc."},
+        {"symbol": "AAPL",  "name": "Apple Inc."},
         {"symbol": "GOOGL", "name": "Alphabet Inc."},
-        {"symbol": "MSFT", "name": "Microsoft Corp."},
-        {"symbol": "TSLA", "name": "Tesla Inc."},
-        {"symbol": "NVDA", "name": "NVIDIA Corp."},
+        {"symbol": "MSFT",  "name": "Microsoft Corp."},
+        {"symbol": "AMZN",  "name": "Amazon.com Inc."},
+        {"symbol": "TSLA",  "name": "Tesla Inc."},
+        {"symbol": "NVDA",  "name": "NVIDIA Corp."},
+        {"symbol": "META",  "name": "Meta Platforms"},
+        {"symbol": "NFLX",  "name": "Netflix Inc."},
+        {"symbol": "JPM",   "name": "JPMorgan Chase"},
+        {"symbol": "V",     "name": "Visa Inc."},
     ]
 
-    # Model Save Path
     MODEL_SAVE_DIR = os.path.join(os.path.dirname(__file__), "saved_models")
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)

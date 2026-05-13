@@ -1,10 +1,40 @@
-import yfinance as yf # pyright: ignore[reportMissingImports]
-import pandas as pd # pyright: ignore[reportMissingModuleSource]
-import numpy as np # pyright: ignore[reportMissingImports]
+import yfinance as yf # type: ignore
+import pandas as pd # type: ignore
+import numpy as np # type: ignore
 from datetime import datetime, timedelta
-import ta  # pyright: ignore[reportMissingImports] # Technical Analysis library
+import ta # type: ignore
 import time
 import random
+
+
+def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3) -> pd.DataFrame:
+    """Fetch stock data with exponential backoff retry logic."""
+    for attempt in range(max_retries):
+        try:
+            # Exponential backoff: 1s, 2s, 4s
+            wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+            time.sleep(wait_time)
+
+            ticker = yf.Ticker(symbol.upper())
+            df = ticker.history(period=period, interval=interval)
+
+            if df is not None and not df.empty:
+                print(f"[SUCCESS] Fetched {symbol} on attempt {attempt + 1}")
+                return df, ticker
+
+            print(f"[WARN] Empty data for {symbol}, attempt {attempt + 1}")
+
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "too many requests" in error_msg or "rate limit" in error_msg:
+                wait = (2 ** attempt) * 3 + random.uniform(1, 3)
+                print(f"[RATE LIMIT] {symbol} attempt {attempt + 1}, waiting {wait:.1f}s")
+                time.sleep(wait)
+            else:
+                print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
+
+    return pd.DataFrame(), None
+
 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
     """
@@ -12,11 +42,8 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
     Returns dict with OHLCV data + technical indicators.
     """
     try:
-        ticker = yf.Ticker(symbol.upper())
-        time.sleep(random.uniform(0.5, 1.5))
-        df = ticker.history(period=period, interval=interval)
+        df, ticker = fetch_with_retry(symbol, period, interval)
 
-        # Debug logging
         print(f"[DEBUG] fetch_stock_data: {symbol}, period={period}, interval={interval}, rows={len(df)}")
 
         if df is None or df.empty:
@@ -33,15 +60,15 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
         try:
             raw_info = ticker.info
             info = {
-                "name":         raw_info.get("longName", symbol),
-                "sector":       raw_info.get("sector", "N/A"),
-                "industry":     raw_info.get("industry", "N/A"),
-                "market_cap":   raw_info.get("marketCap", 0),
-                "pe_ratio":     raw_info.get("trailingPE", 0),
+                "name":                raw_info.get("longName", symbol),
+                "sector":              raw_info.get("sector", "N/A"),
+                "industry":            raw_info.get("industry", "N/A"),
+                "market_cap":          raw_info.get("marketCap", 0),
+                "pe_ratio":            raw_info.get("trailingPE", 0),
                 "fifty_two_week_high": raw_info.get("fiftyTwoWeekHigh", 0),
                 "fifty_two_week_low":  raw_info.get("fiftyTwoWeekLow", 0),
-                "avg_volume":   raw_info.get("averageVolume", 0),
-                "currency":     raw_info.get("currency", "USD"),
+                "avg_volume":          raw_info.get("averageVolume", 0),
+                "currency":            raw_info.get("currency", "USD"),
             }
         except Exception as e:
             print(f"[WARN] Could not fetch company info for {symbol}: {e}")
@@ -72,23 +99,22 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
             except Exception:
                 continue
 
-        # Current price stats
         last_close = float(df["Close"].iloc[-1])
         prev_close = float(df["Close"].iloc[-2]) if len(df) > 1 else last_close
         price_change = last_close - prev_close
         price_change_pct = (price_change / prev_close) * 100 if prev_close else 0
 
         return {
-            "success": True,
-            "symbol":  symbol.upper(),
-            "info":    info,
-            "current_price":      round(last_close, 2),
-            "price_change":       round(price_change, 2),
-            "price_change_pct":   round(price_change_pct, 2),
-            "historical":         historical,
-            "data_points":        len(historical),
-            "start_date":         historical[0]["date"] if historical else None,
-            "end_date":           historical[-1]["date"] if historical else None,
+            "success":          True,
+            "symbol":           symbol.upper(),
+            "info":             info,
+            "current_price":    round(last_close, 2),
+            "price_change":     round(price_change, 2),
+            "price_change_pct": round(price_change_pct, 2),
+            "historical":       historical,
+            "data_points":      len(historical),
+            "start_date":       historical[0]["date"] if historical else None,
+            "end_date":         historical[-1]["date"] if historical else None,
         }
 
     except Exception as e:
@@ -100,12 +126,10 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Add SMA, EMA, RSI, MACD, Bollinger Bands to dataframe."""
     try:
         close = df["Close"]
-        # Moving averages
         df["SMA_20"] = close.rolling(window=20).mean()
         df["SMA_50"] = close.rolling(window=50).mean()
         df["EMA_20"] = close.ewm(span=20, adjust=False).mean()
 
-        # RSI
         delta = close.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
@@ -114,13 +138,11 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
         rs = avg_gain / avg_loss.replace(0, np.nan)
         df["RSI"] = 100 - (100 / (1 + rs))
 
-        # MACD
         ema_12 = close.ewm(span=12, adjust=False).mean()
         ema_26 = close.ewm(span=26, adjust=False).mean()
         df["MACD"] = ema_12 - ema_26
         df["MACD_Signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
 
-        # Bollinger Bands
         rolling_std = close.rolling(20).std()
         rolling_mean = close.rolling(20).mean()
         df["BB_Upper"] = rolling_mean + (rolling_std * 2)
@@ -152,8 +174,8 @@ def search_stock(query: str) -> list:
         info = ticker.info
         if info and info.get("symbol"):
             return [{
-                "symbol": info["symbol"],
-                "name":   info.get("longName", query),
+                "symbol":   info["symbol"],
+                "name":     info.get("longName", query),
                 "exchange": info.get("exchange", ""),
             }]
         return []
