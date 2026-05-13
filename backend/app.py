@@ -1,5 +1,6 @@
-from flask import Flask, jsonify # pyright: ignore[reportMissingImports]
-from flask_cors import CORS # pyright: ignore[reportMissingModuleSource]
+from flask import Flask, jsonify # type: ignore
+from flask_cors import CORS # type: ignore
+from flask_caching import Cache # type: ignore
 from config import Config
 from routes.stock_routes import stock_bp
 from routes.prediction_routes import predict_bp
@@ -8,7 +9,15 @@ from routes.prediction_routes import predict_bp
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Allow React dev server (port 3000) and production
+# ── Cache config (10 min cache) ────────────────────────────────────────────────
+app.config["CACHE_TYPE"] = "SimpleCache"
+app.config["CACHE_DEFAULT_TIMEOUT"] = 600  # 10 minutes
+cache = Cache(app)
+
+# Make cache available to blueprints
+app.cache = cache
+
+# Allow React dev server and production
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "*"]}})
 
 # ── Register blueprints ────────────────────────────────────────────────────────

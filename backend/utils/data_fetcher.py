@@ -3,7 +3,8 @@ import pandas as pd # pyright: ignore[reportMissingModuleSource]
 import numpy as np # pyright: ignore[reportMissingImports]
 from datetime import datetime, timedelta
 import ta  # pyright: ignore[reportMissingImports] # Technical Analysis library
-
+import time
+import random
 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
     """
@@ -12,6 +13,7 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
     """
     try:
         ticker = yf.Ticker(symbol.upper())
+        time.sleep(random.uniform(0.5, 1.5))
         df = ticker.history(period=period, interval=interval)
 
         # Debug logging
