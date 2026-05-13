@@ -14,7 +14,7 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
     ticker = None
     for attempt in range(max_retries):
         try:
-            wait_time = (2 ** attempt) + random.uniform(0.5, 1.5)
+            wait_time = random.uniform(0.5, 1.0)
             time.sleep(wait_time)
 
             ticker = yf.Ticker(symbol.upper())
