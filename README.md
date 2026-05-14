@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/stockseer-ai/stockseer/main/docs/banner.png" alt="StockSeer Banner" width="100%"/>
+<img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/banner.png" alt="Predictastock Banner" width="100%"/>
 
-# 📈 StockSeer — AI Stock Price Forecasting
+# 📈 Predictastock — AI Stock Price Forecasting
 
 <p align="center">
   <strong>Deep learning LSTM neural networks predict 30-day stock price trajectories using 2 years of real market data.</strong>
@@ -43,21 +43,21 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/stockseer-ai/stockseer/main/docs/screenshot-home.png" alt="Home Page" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-home.png" alt="Home Page" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>🏠 Home Page</strong>
     </td>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/stockseer-ai/stockseer/main/docs/screenshot-dashboard.png" alt="Dashboard" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-dashboard.png" alt="Dashboard" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>📊 Analysis Dashboard</strong>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/stockseer-ai/stockseer/main/docs/screenshot-forecast.png" alt="Forecast Table" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-forecast.png" alt="Forecast Table" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>🔮 30-Day Forecast Table</strong>
     </td>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/stockseer-ai/stockseer/main/docs/screenshot-mobile.png" alt="Mobile View" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-mobile.png" alt="Mobile View" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>📱 Mobile Responsive</strong>
     </td>
   </tr>
@@ -158,8 +158,8 @@ stock-lstm-project/
 ### Option 1 — Docker Compose *(Recommended)*
 
 ```bash
-git clone https://github.com/stockseer-ai/stockseer.git
-cd stockseer
+git clone https://github.com/Predictastock-ai/Predictastock.git
+cd Predictastock
 docker-compose up --build
 ```
 
@@ -358,14 +358,14 @@ Output: Predicted Close Price (next day)
 
 ## ⚠️ Disclaimer
 
-> StockSeer is an **educational and research tool only**. Nothing on this platform constitutes financial advice, investment recommendations, or a solicitation to buy or sell any securities. LSTM models identify patterns in historical data but cannot reliably predict future market movements. Past model performance does not guarantee future results. Always consult a qualified financial advisor before making investment decisions.
+> Predictastock is an **educational and research tool only**. Nothing on this platform constitutes financial advice, investment recommendations, or a solicitation to buy or sell any securities. LSTM models identify patterns in historical data but cannot reliably predict future market movements. Past model performance does not guarantee future results. Always consult a qualified financial advisor before making investment decisions.
 
 ---
 
 ## 📄 License
 
 ```
-MIT License — Copyright (c) 2024 StockSeer Team
+MIT License — Copyright (c) 2024 Predictastock Team
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -382,6 +382,6 @@ See [`LICENSE`](LICENSE) for the full text.
 
 **⭐ Star this repo if it helped you learn something!**
 
-Made with ❤️ in India &nbsp;·&nbsp; [stockseer.ai](https://stockseer.ai) &nbsp;·&nbsp; Built with TensorFlow, React & Flask
+Made with ❤️ in India &nbsp;·&nbsp; [Predictastock.ai](https://Predictastock.ai) &nbsp;·&nbsp; Built with TensorFlow, React & Flask
 
 </div>
