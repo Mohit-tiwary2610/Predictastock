@@ -4,20 +4,33 @@ import numpy as np # type: ignore
 from datetime import datetime, timedelta
 import time
 import random
+import requests
 from threading import Lock
 
 _api_lock = Lock()
 
+# Custom session with browser-like headers to avoid blocking
+def get_session():
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    })
+    return session
+
 
 def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
-    """Fetch stock data with exponential backoff retry logic."""
-    ticker = None
+    """Fetch stock data with custom session and retry logic."""
     for attempt in range(max_retries):
         try:
             wait_time = random.uniform(0.5, 1.0)
             time.sleep(wait_time)
 
-            ticker = yf.Ticker(symbol.upper())
+            session = get_session()
+            ticker = yf.Ticker(symbol.upper(), session=session)
             df = ticker.history(period=period, interval=interval)
 
             if df is not None and not df.empty:
@@ -28,14 +41,14 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
 
         except Exception as e:
             error_msg = str(e).lower()
-            if "too many requests" in error_msg or "rate limit" in error_msg:
-                wait = (2 ** attempt) * 3 + random.uniform(1, 3)
+            if "too many requests" in error_msg or "rate limit" in error_msg or "429" in error_msg:
+                wait = (2 ** attempt) * 2 + random.uniform(1, 3)
                 print(f"[RATE LIMIT] {symbol} attempt {attempt + 1}, waiting {wait:.1f}s")
                 time.sleep(wait)
             else:
                 print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
 
-    return pd.DataFrame(), ticker
+    return pd.DataFrame(), None
 
 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
@@ -59,7 +72,9 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
 
         info = {}
         try:
-            raw_info = ticker.info
+            session = get_session()
+            ticker_info = yf.Ticker(symbol.upper(), session=session)
+            raw_info = ticker_info.info
             info = {
                 "name":                raw_info.get("longName", symbol),
                 "sector":              raw_info.get("sector", "N/A"),
@@ -157,7 +172,8 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
 def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
     """Return raw DataFrame for ML training."""
     try:
-        ticker = yf.Ticker(symbol.upper())
+        session = get_session()
+        ticker = yf.Ticker(symbol.upper(), session=session)
         df = ticker.history(period=period, interval="1d")
         df = df.reset_index()
         df.columns = [c.replace(" ", "_") for c in df.columns]
@@ -170,7 +186,8 @@ def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
 def search_stock(query: str) -> list:
     """Simple stock symbol search."""
     try:
-        ticker = yf.Ticker(query.upper())
+        session = get_session()
+        ticker = yf.Ticker(query.upper(), session=session)
         info = ticker.info
         if info and info.get("symbol"):
             return [{
