@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/banner.png" alt="Predictastock Banner" width="100%"/>
+<img src="assets/banner.png" alt="Predictastock Banner" width="100%"/>
 
 # 📈 Predictastock — AI Stock Price Forecasting
 
@@ -43,21 +43,21 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-home.png" alt="Home Page" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="assets/home.png" alt="Home Page" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>🏠 Home Page</strong>
     </td>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-dashboard.png" alt="Dashboard" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="assets/dashboard.png" alt="Dashboard" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>📊 Analysis Dashboard</strong>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-forecast.png" alt="Forecast Table" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="assets/forecast.png" alt="Forecast Table" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>🔮 30-Day Forecast Table</strong>
     </td>
     <td align="center" width="50%">
-      <img src="https://raw.githubusercontent.com/Predictastock-ai/Predictastock/main/docs/screenshot-mobile.png" alt="Mobile View" style="border-radius:8px;border:1px solid #162d4a"/>
+      <img src="assets/mobile.png" alt="Mobile View" style="border-radius:8px;border:1px solid #162d4a"/>
       <br/><strong>📱 Mobile Responsive</strong>
     </td>
   </tr>
