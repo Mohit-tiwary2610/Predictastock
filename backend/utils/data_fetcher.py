@@ -5,32 +5,35 @@ from datetime import datetime, timedelta
 import time
 import random
 import requests
+import os
+import urllib3
 from threading import Lock
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _api_lock = Lock()
 
-# Custom session with browser-like headers to avoid blocking
+def get_scraper_api_key():
+    return os.getenv("SCRAPER_API_KEY", "c2145393adaaf832449ea11eea8f941b")
+
 def get_session():
-    user_agents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-    ]
+    api_key = get_scraper_api_key()
     session = requests.Session()
+    session.proxies = {
+        "http": f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001",
+        "https": f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001",
+    }
+    session.verify = False
     session.headers.update({
-        'User-Agent': random.choice(user_agents),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
     })
     return session
 
 
 def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
-    """Fetch stock data with custom session and retry logic."""
+    """Fetch stock data with ScraperAPI proxy and retry logic."""
     for attempt in range(max_retries):
         try:
             wait_time = random.uniform(0.5, 1.0)
@@ -47,20 +50,15 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
             print(f"[WARN] Empty data for {symbol}, attempt {attempt + 1}")
 
         except Exception as e:
-            error_msg = str(e).lower()
-            if "too many requests" in error_msg or "rate limit" in error_msg or "429" in error_msg:
-                wait = (2 ** attempt) * 2 + random.uniform(1, 3)
-                print(f"[RATE LIMIT] {symbol} attempt {attempt + 1}, waiting {wait:.1f}s")
-                time.sleep(wait)
-            else:
-                print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
+            print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
+            time.sleep(2 ** attempt)
 
     return pd.DataFrame(), None
 
 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
     """
-    Fetch historical stock data from Yahoo Finance.
+    Fetch historical stock data from Yahoo Finance via ScraperAPI proxy.
     Returns dict with OHLCV data + technical indicators.
     """
     try:
