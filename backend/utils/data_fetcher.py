@@ -85,11 +85,23 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
 
         df = add_technical_indicators(df)
 
+        # Get company info with retry
         info = {}
         try:
-            session = get_session()
-            ticker_info = yf.Ticker(symbol.upper(), session=session)
-            raw_info = ticker_info.info
+            raw_info = {}
+            for attempt in range(3):
+                try:
+                    session = get_session()
+                    ticker_info = yf.Ticker(symbol.upper(), session=session)
+                    raw_info = ticker_info.info
+                    if raw_info and raw_info.get("longName"):
+                        print(f"[SUCCESS] Got company info for {symbol} on attempt {attempt + 1}")
+                        break
+                    time.sleep(1)
+                except Exception as e:
+                    print(f"[WARN] Company info attempt {attempt + 1} failed: {e}")
+                    time.sleep(1)
+
             info = {
                 "name":                raw_info.get("longName", symbol),
                 "sector":              raw_info.get("sector", "N/A"),
