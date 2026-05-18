@@ -1,31 +1,36 @@
 from flask import Flask, jsonify # type: ignore
 from flask_cors import CORS # type: ignore
 from flask_caching import Cache # type: ignore
+from flask_limiter import Limiter # type: ignore
+from flask_limiter.util import get_remote_address # type: ignore
 from config import Config
 from routes.stock_routes import stock_bp
 from routes.prediction_routes import predict_bp
 
-# ── Create Flask app ───────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# ── Cache config (10 min cache) ────────────────────────────────────────────────
+# Cache config
 app.config["CACHE_TYPE"] = "SimpleCache"
-app.config["CACHE_DEFAULT_TIMEOUT"] = 600  # 10 minutes
+app.config["CACHE_DEFAULT_TIMEOUT"] = 600
 cache = Cache(app)
-
-# Make cache available to blueprints
 app.cache = cache
 
-# Allow React dev server and production
+# Rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+app.limiter = limiter
+
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "*"]}})
 
-# ── Register blueprints ────────────────────────────────────────────────────────
 app.register_blueprint(stock_bp)
 app.register_blueprint(predict_bp)
 
 
-# ── Health check ───────────────────────────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def root():
     return jsonify({
@@ -49,17 +54,23 @@ def health():
     return jsonify({"status": "ok", "message": "LSTM Stock Forecaster API is healthy"})
 
 
-# ── Error handlers ─────────────────────────────────────────────────────────────
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"success": False, "error": "Endpoint not found"}), 404
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({
+        "success": False,
+        "error": "Too many requests. Please slow down!",
+        "retry_after": "60 seconds"
+    }), 429
 
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({"success": False, "error": "Internal server error", "details": str(e)}), 500
 
 
-# ── Run ────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=" * 55)
     print("  📈  Stock LSTM Forecasting API")

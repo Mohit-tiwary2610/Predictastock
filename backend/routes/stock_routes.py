@@ -5,25 +5,28 @@ import random
 from threading import Lock
 
 stock_bp = Blueprint("stock", __name__, url_prefix="/api/stock")
-
-# Global request lock to queue requests one at a time
 _request_lock = Lock()
 
 
 def get_cache():
     return getattr(current_app, 'cache', None)
 
+def get_limiter():
+    return getattr(current_app, 'limiter', None)
 
 def locked_fetch(fetch_fn, *args, **kwargs):
-    """Queue requests using a lock to prevent simultaneous Yahoo Finance calls."""
     with _request_lock:
         return fetch_fn(*args, **kwargs)
 
 
 @stock_bp.route("/data/<symbol>", methods=["GET"])
 def get_stock_data(symbol):
-    """GET /api/stock/data/<SYMBOL>"""
+    """GET /api/stock/data/<SYMBOL> - Limited to 30 per hour per IP"""
     try:
+        limiter = get_limiter()
+        if limiter:
+            limiter.limit("30 per hour")(lambda: None)()
+
         from utils.data_fetcher import fetch_stock_data
         from config import Config
 
@@ -50,6 +53,11 @@ def get_stock_data(symbol):
         return jsonify(result), 200
 
     except Exception as e:
+        if "429" in str(e) or "Too Many" in str(e):
+            return jsonify({
+                "success": False,
+                "error": "Rate limit exceeded. Try again later."
+            }), 429
         print(f"[ERROR] {str(e)}")
         traceback.print_exc()
         return jsonify({"success": False, "error": f"Internal error: {str(e)}"}), 500
@@ -57,8 +65,12 @@ def get_stock_data(symbol):
 
 @stock_bp.route("/popular", methods=["GET"])
 def get_popular_stocks():
-    """GET /api/stock/popular"""
+    """GET /api/stock/popular - Limited to 10 per hour per IP"""
     try:
+        limiter = get_limiter()
+        if limiter:
+            limiter.limit("10 per hour")(lambda: None)()
+
         from utils.data_fetcher import fetch_stock_data
         from config import Config
 
@@ -72,7 +84,6 @@ def get_popular_stocks():
 
         stocks = []
         for s in Config.POPULAR_STOCKS:
-            # Queue each request one at a time
             result = locked_fetch(fetch_stock_data, s["symbol"], period="5d")
             stocks.append({
                 "symbol":           s["symbol"],
@@ -97,8 +108,12 @@ def get_popular_stocks():
 
 @stock_bp.route("/search", methods=["GET"])
 def search_stocks():
-    """GET /api/stock/search?q=AAPL"""
+    """GET /api/stock/search - Limited to 20 per hour per IP"""
     try:
+        limiter = get_limiter()
+        if limiter:
+            limiter.limit("20 per hour")(lambda: None)()
+
         from utils.data_fetcher import search_stock
 
         query = request.args.get("q", "").strip()
@@ -126,8 +141,12 @@ def search_stocks():
 
 @stock_bp.route("/info/<symbol>", methods=["GET"])
 def get_stock_info(symbol):
-    """GET /api/stock/info/<SYMBOL>"""
+    """GET /api/stock/info/<SYMBOL> - Limited to 30 per hour per IP"""
     try:
+        limiter = get_limiter()
+        if limiter:
+            limiter.limit("30 per hour")(lambda: None)()
+
         from utils.data_fetcher import fetch_stock_data
 
         cache = get_cache()
