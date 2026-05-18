@@ -6,6 +6,7 @@ import time
 import random
 import requests
 import os
+import itertools
 import urllib3
 from threading import Lock
 
@@ -13,8 +14,17 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _api_lock = Lock()
 
+# Rotate through multiple API keys
+_keys = [
+    os.getenv("SCRAPER_API_KEY_1", ""),
+    os.getenv("SCRAPER_API_KEY_2", ""),
+    os.getenv("SCRAPER_API_KEY_3", ""),
+]
+_key_cycle = itertools.cycle([k for k in _keys if k])
+
 def get_scraper_api_key():
-    return os.getenv("SCRAPER_API_KEY", "c2145393adaaf832449ea11eea8f941b")
+    return next(_key_cycle)
+
 
 def get_session():
     api_key = get_scraper_api_key()
@@ -33,7 +43,7 @@ def get_session():
 
 
 def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
-    """Fetch stock data with ScraperAPI proxy and retry logic."""
+    """Fetch stock data with ScraperAPI proxy rotation and retry logic."""
     for attempt in range(max_retries):
         try:
             wait_time = random.uniform(0.5, 1.0)

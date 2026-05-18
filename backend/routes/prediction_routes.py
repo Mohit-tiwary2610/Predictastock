@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request # type: ignore
 import traceback
 
 predict_bp = Blueprint("predict", __name__, url_prefix="/api/predict")
