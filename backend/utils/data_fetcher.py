@@ -1,122 +1,135 @@
-import yfinance as yf # type: ignore
-import pandas as pd # type: ignore
-import numpy as np # type: ignore
+import requests
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 import time
-import random
-import requests
 import os
-import itertools
-import urllib3
 from threading import Lock
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
+ 
 _api_lock = Lock()
-
-# Rotate through multiple API keys
-_keys = [
-    os.getenv("SCRAPER_API_KEY_1", ""),
-    os.getenv("SCRAPER_API_KEY_2", ""),
-    os.getenv("SCRAPER_API_KEY_3", ""),
-]
-_key_cycle = itertools.cycle([k for k in _keys if k])
-
-def get_scraper_api_key():
-    return next(_key_cycle)
-
-
-def get_session():
-    api_key = get_scraper_api_key()
-    session = requests.Session()
-    session.proxies = {
-        "http": f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001",
-        "https": f"http://scraperapi:{api_key}@proxy-server.scraperapi.com:8001",
-    }
-    session.verify = False
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-    })
-    return session
-
-
+ 
+TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "3f3c1a3549e24b5a96f67c505074693c")
+BASE_URL = "https://api.twelvedata.com"
+ 
+ 
 def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
-    """Fetch stock data with ScraperAPI proxy rotation and retry logic."""
+    """Fetch stock data from Twelve Data API with retry logic."""
+ 
+    # Convert yfinance period format to Twelve Data outputsize
+    period_map = {
+        "1d": 1, "5d": 5, "1mo": 30, "3mo": 90,
+        "6mo": 180, "1y": 365, "2y": 730, "5y": 1825
+    }
+    outputsize = period_map.get(period, 730)  # default 2 years
+ 
     for attempt in range(max_retries):
         try:
-            wait_time = random.uniform(0.5, 1.0)
-            time.sleep(wait_time)
-
-            session = get_session()
-            ticker = yf.Ticker(symbol.upper(), session=session)
-            df = ticker.history(period=period, interval=interval)
-
-            if df is not None and not df.empty:
-                print(f"[SUCCESS] Fetched {symbol} on attempt {attempt + 1}")
-                return df, ticker
-
-            print(f"[WARN] Empty data for {symbol}, attempt {attempt + 1}")
-
+            url = f"{BASE_URL}/time_series"
+            params = {
+                "symbol": symbol.upper(),
+                "interval": interval,
+                "outputsize": outputsize,
+                "apikey": TWELVE_DATA_API_KEY,
+                "format": "JSON"
+            }
+            response = requests.get(url, params=params, timeout=15)
+            data = response.json()
+ 
+            if data.get("status") == "error":
+                print(f"[ERROR] API error for {symbol}: {data.get('message')}")
+                time.sleep(2 ** attempt)
+                continue
+ 
+            values = data.get("values", [])
+            if not values:
+                print(f"[WARN] Empty data for {symbol}, attempt {attempt + 1}")
+                time.sleep(2 ** attempt)
+                continue
+ 
+            # Convert to DataFrame
+            df = pd.DataFrame(values)
+            df = df.rename(columns={
+                "datetime": "Date",
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume"
+            })
+            df["Date"] = pd.to_datetime(df["Date"])
+            df["Open"] = df["Open"].astype(float)
+            df["High"] = df["High"].astype(float)
+            df["Low"] = df["Low"].astype(float)
+            df["Close"] = df["Close"].astype(float)
+            df["Volume"] = df["Volume"].fillna(0).astype(float).astype(int)
+            df = df.sort_values("Date").reset_index(drop=True)
+ 
+            print(f"[SUCCESS] Fetched {symbol} on attempt {attempt + 1}")
+            return df
+ 
         except Exception as e:
             print(f"[ERROR] {symbol} attempt {attempt + 1}: {e}")
             time.sleep(2 ** attempt)
-
-    return pd.DataFrame(), None
-
-
+ 
+    return pd.DataFrame()
+ 
+ 
+def fetch_company_info(symbol: str) -> dict:
+    """Fetch company profile from Twelve Data."""
+    try:
+        # Profile endpoint
+        url = f"{BASE_URL}/profile"
+        params = {"symbol": symbol.upper(), "apikey": TWELVE_DATA_API_KEY}
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+ 
+        if data.get("status") == "error":
+            return {"name": symbol}
+ 
+        # Statistics endpoint for PE ratio etc
+        stats_url = f"{BASE_URL}/statistics"
+        stats_params = {"symbol": symbol.upper(), "apikey": TWELVE_DATA_API_KEY}
+        stats_response = requests.get(stats_url, params=stats_params, timeout=10)
+        stats = stats_response.json()
+ 
+        valuations = stats.get("statistics", {}).get("valuations_metrics", {})
+        financials = stats.get("statistics", {}).get("financials", {})
+ 
+        return {
+            "name":                data.get("name", symbol),
+            "sector":              data.get("sector", "N/A"),
+            "industry":            data.get("industry", "N/A"),
+            "market_cap":          financials.get("market_capitalization", 0),
+            "pe_ratio":            valuations.get("trailing_pe", 0),
+            "fifty_two_week_high": data.get("fifty_two_week", {}).get("high", 0) if isinstance(data.get("fifty_two_week"), dict) else 0,
+            "fifty_two_week_low":  data.get("fifty_two_week", {}).get("low", 0) if isinstance(data.get("fifty_two_week"), dict) else 0,
+            "avg_volume":          0,
+            "currency":            data.get("currency", "USD"),
+        }
+    except Exception as e:
+        print(f"[WARN] Could not fetch company info for {symbol}: {e}")
+        return {"name": symbol}
+ 
+ 
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
     """
-    Fetch historical stock data from Yahoo Finance via ScraperAPI proxy.
+    Fetch historical stock data from Twelve Data API.
     Returns dict with OHLCV data + technical indicators.
     """
     try:
         with _api_lock:
-            df, ticker = fetch_with_retry(symbol, period, interval)
-
-        print(f"[DEBUG] fetch_stock_data: {symbol}, period={period}, interval={interval}, rows={len(df)}")
-
+            df = fetch_with_retry(symbol, period, interval)
+ 
+        print(f"[DEBUG] fetch_stock_data: {symbol}, period={period}, rows={len(df)}")
+ 
         if df is None or df.empty:
             return {"success": False, "error": f"No data found for symbol '{symbol}'"}
-
-        df = df.reset_index()
-        df.columns = [c.replace(" ", "_") for c in df.columns]
-
+ 
         df = add_technical_indicators(df)
-
-        # Get company info with retry
-        info = {}
-        try:
-            raw_info = {}
-            for attempt in range(3):
-                try:
-                    session = get_session()
-                    ticker_info = yf.Ticker(symbol.upper(), session=session)
-                    raw_info = ticker_info.info
-                    if raw_info and raw_info.get("longName"):
-                        print(f"[SUCCESS] Got company info for {symbol} on attempt {attempt + 1}")
-                        break
-                    time.sleep(1)
-                except Exception as e:
-                    print(f"[WARN] Company info attempt {attempt + 1} failed: {e}")
-                    time.sleep(1)
-
-            info = {
-                "name":                raw_info.get("longName", symbol),
-                "sector":              raw_info.get("sector", "N/A"),
-                "industry":            raw_info.get("industry", "N/A"),
-                "market_cap":          raw_info.get("marketCap", 0),
-                "pe_ratio":            raw_info.get("trailingPE", 0),
-                "fifty_two_week_high": raw_info.get("fiftyTwoWeekHigh", 0),
-                "fifty_two_week_low":  raw_info.get("fiftyTwoWeekLow", 0),
-                "avg_volume":          raw_info.get("averageVolume", 0),
-                "currency":            raw_info.get("currency", "USD"),
-            }
-        except Exception as e:
-            print(f"[WARN] Could not fetch company info for {symbol}: {e}")
-            info = {"name": symbol}
-
+ 
+        # Get company info
+        info = fetch_company_info(symbol)
+ 
         historical = []
         for _, row in df.iterrows():
             try:
@@ -125,7 +138,7 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
                     date_str = date_val.strftime("%Y-%m-%d")
                 else:
                     date_str = str(date_val)[:10]
-
+ 
                 historical.append({
                     "date":   date_str,
                     "open":   round(float(row["Open"]),  2),
@@ -140,12 +153,12 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
                 })
             except Exception:
                 continue
-
+ 
         last_close = float(df["Close"].iloc[-1])
         prev_close = float(df["Close"].iloc[-2]) if len(df) > 1 else last_close
         price_change = last_close - prev_close
         price_change_pct = (price_change / prev_close) * 100 if prev_close else 0
-
+ 
         return {
             "success":          True,
             "symbol":           symbol.upper(),
@@ -158,12 +171,12 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
             "start_date":       historical[0]["date"] if historical else None,
             "end_date":         historical[-1]["date"] if historical else None,
         }
-
+ 
     except Exception as e:
         print(f"[ERROR] fetch_stock_data failed for {symbol}: {e}")
         return {"success": False, "error": str(e)}
-
-
+ 
+ 
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Add SMA, EMA, RSI, MACD, Bollinger Bands to dataframe."""
     try:
@@ -171,7 +184,7 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
         df["SMA_20"] = close.rolling(window=20).mean()
         df["SMA_50"] = close.rolling(window=50).mean()
         df["EMA_20"] = close.ewm(span=20, adjust=False).mean()
-
+ 
         delta = close.diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
@@ -179,49 +192,52 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
         avg_loss = loss.rolling(14).mean()
         rs = avg_gain / avg_loss.replace(0, np.nan)
         df["RSI"] = 100 - (100 / (1 + rs))
-
+ 
         ema_12 = close.ewm(span=12, adjust=False).mean()
         ema_26 = close.ewm(span=26, adjust=False).mean()
         df["MACD"] = ema_12 - ema_26
         df["MACD_Signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
-
+ 
         rolling_std = close.rolling(20).std()
         rolling_mean = close.rolling(20).mean()
         df["BB_Upper"] = rolling_mean + (rolling_std * 2)
         df["BB_Lower"] = rolling_mean - (rolling_std * 2)
-
+ 
         df = df.fillna(0)
     except Exception as e:
         print(f"[WARN] Could not add technical indicators: {e}")
     return df
-
-
+ 
+ 
 def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
     """Return raw DataFrame for ML training."""
     try:
-        session = get_session()
-        ticker = yf.Ticker(symbol.upper(), session=session)
-        df = ticker.history(period=period, interval="1d")
-        df = df.reset_index()
-        df.columns = [c.replace(" ", "_") for c in df.columns]
-        return df
+        df = fetch_with_retry(symbol, period, "1d")
+        return df if df is not None else pd.DataFrame()
     except Exception as e:
         print(f"Error fetching raw data: {e}")
         return pd.DataFrame()
-
-
+ 
+ 
 def search_stock(query: str) -> list:
-    """Simple stock symbol search."""
+    """Search stocks using Twelve Data symbol search."""
     try:
-        session = get_session()
-        ticker = yf.Ticker(query.upper(), session=session)
-        info = ticker.info
-        if info and info.get("symbol"):
-            return [{
-                "symbol":   info["symbol"],
-                "name":     info.get("longName", query),
-                "exchange": info.get("exchange", ""),
-            }]
-        return []
+        url = f"{BASE_URL}/symbol_search"
+        params = {
+            "symbol": query.upper(),
+            "apikey": TWELVE_DATA_API_KEY
+        }
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+ 
+        results = []
+        for item in data.get("data", [])[:5]:
+            if item.get("instrument_type") == "Common Stock":
+                results.append({
+                    "symbol":   item.get("symbol", ""),
+                    "name":     item.get("instrument_name", query),
+                    "exchange": item.get("exchange", ""),
+                })
+        return results
     except Exception:
         return []
