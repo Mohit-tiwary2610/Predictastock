@@ -1,14 +1,16 @@
 import os
-from dotenv import load_dotenv # type: ignore
-
+from dotenv import load_dotenv  # type: ignore
 load_dotenv()
-
+ 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "lstm-stock-secret-key-2024")
-    DEBUG = os.getenv("DEBUG", "True") == "True"
-    PORT = int(os.getenv("PORT", 5000))
+    DEBUG = os.getenv("DEBUG", "False") == "True"
+    PORT = int(os.getenv("PORT", 7860))  # HuggingFace requires 7860
     HOST = os.getenv("HOST", "0.0.0.0")
-
+ 
+    # Twelve Data API Key
+    TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "3f3c1a3549e24b5a96f67c505074693c")
+ 
     # LSTM Model Configuration
     SEQUENCE_LENGTH = 60
     PREDICTION_DAYS = 30
@@ -20,14 +22,13 @@ class Config:
     DROPOUT_RATE = 0.2
     VALIDATION_SPLIT = 0.1
     LEARNING_RATE = 0.001
-
+ 
     # Data Configuration
     DEFAULT_PERIOD = "2y"
     DEFAULT_INTERVAL = "1d"
     FEATURE_COLUMNS = ["Open", "High", "Low", "Close", "Volume"]
     TARGET_COLUMN = "Close"
-
-    # All 10 popular stocks
+ 
     POPULAR_STOCKS = [
         {"symbol": "AAPL",  "name": "Apple Inc."},
         {"symbol": "GOOGL", "name": "Alphabet Inc."},
@@ -40,6 +41,6 @@ class Config:
         {"symbol": "JPM",   "name": "JPMorgan Chase"},
         {"symbol": "V",     "name": "Visa Inc."},
     ]
-
+ 
     MODEL_SAVE_DIR = os.path.join(os.path.dirname(__file__), "saved_models")
     os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
