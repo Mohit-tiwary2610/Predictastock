@@ -13,14 +13,11 @@ BASE_URL = "https://api.twelvedata.com"
  
  
 def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int = 3):
-    """Fetch stock data from Twelve Data API with retry logic."""
- 
-    # Convert yfinance period format to Twelve Data outputsize
     period_map = {
         "1d": 1, "5d": 5, "1mo": 30, "3mo": 90,
         "6mo": 180, "1y": 365, "2y": 730, "5y": 1825
     }
-    outputsize = period_map.get(period, 730)  # default 2 years
+    outputsize = period_map.get(period, 730)
  
     for attempt in range(max_retries):
         try:
@@ -30,10 +27,17 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
                 "interval": interval,
                 "outputsize": outputsize,
                 "apikey": TWELVE_DATA_API_KEY,
-                "format": "JSON"
+                "format": "JSON",
+                "exchange": "NASDAQ"
             }
             response = requests.get(url, params=params, timeout=15)
             data = response.json()
+ 
+            if data.get("status") == "error":
+                # Try without exchange restriction
+                params.pop("exchange")
+                response = requests.get(url, params=params, timeout=15)
+                data = response.json()
  
             if data.get("status") == "error":
                 print(f"[ERROR] API error for {symbol}: {data.get('message')}")
@@ -46,7 +50,6 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
                 time.sleep(2 ** attempt)
                 continue
  
-            # Convert to DataFrame
             df = pd.DataFrame(values)
             df = df.rename(columns={
                 "datetime": "Date",
@@ -75,9 +78,7 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
  
  
 def fetch_company_info(symbol: str) -> dict:
-    """Fetch company profile from Twelve Data."""
     try:
-        # Profile endpoint
         url = f"{BASE_URL}/profile"
         params = {"symbol": symbol.upper(), "apikey": TWELVE_DATA_API_KEY}
         response = requests.get(url, params=params, timeout=10)
@@ -86,7 +87,6 @@ def fetch_company_info(symbol: str) -> dict:
         if data.get("status") == "error":
             return {"name": symbol}
  
-        # Statistics endpoint for PE ratio etc
         stats_url = f"{BASE_URL}/statistics"
         stats_params = {"symbol": symbol.upper(), "apikey": TWELVE_DATA_API_KEY}
         stats_response = requests.get(stats_url, params=stats_params, timeout=10)
@@ -112,10 +112,6 @@ def fetch_company_info(symbol: str) -> dict:
  
  
 def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> dict:
-    """
-    Fetch historical stock data from Twelve Data API.
-    Returns dict with OHLCV data + technical indicators.
-    """
     try:
         with _api_lock:
             df = fetch_with_retry(symbol, period, interval)
@@ -126,8 +122,6 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
             return {"success": False, "error": f"No data found for symbol '{symbol}'"}
  
         df = add_technical_indicators(df)
- 
-        # Get company info
         info = fetch_company_info(symbol)
  
         historical = []
@@ -178,7 +172,6 @@ def fetch_stock_data(symbol: str, period: str = "2y", interval: str = "1d") -> d
  
  
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Add SMA, EMA, RSI, MACD, Bollinger Bands to dataframe."""
     try:
         close = df["Close"]
         df["SMA_20"] = close.rolling(window=20).mean()
@@ -210,7 +203,6 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
  
  
 def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
-    """Return raw DataFrame for ML training."""
     try:
         df = fetch_with_retry(symbol, period, "1d")
         return df if df is not None else pd.DataFrame()
@@ -220,7 +212,6 @@ def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
  
  
 def search_stock(query: str) -> list:
-    """Search stocks using Twelve Data symbol search."""
     try:
         url = f"{BASE_URL}/symbol_search"
         params = {
