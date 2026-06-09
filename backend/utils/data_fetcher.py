@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
 import time
 import os
 from threading import Lock
@@ -19,6 +18,18 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
     }
     outputsize = period_map.get(period, 730)
  
+    # Fix interval format for Twelve Data
+    interval_map = {
+        "1d": "1day",
+        "1wk": "1week",
+        "1mo": "1month",
+        "5m": "5min",
+        "15m": "15min",
+        "30m": "30min",
+        "1h": "1h",
+    }
+    interval = interval_map.get(interval, interval)
+ 
     for attempt in range(max_retries):
         try:
             url = f"{BASE_URL}/time_series"
@@ -28,16 +39,9 @@ def fetch_with_retry(symbol: str, period: str, interval: str, max_retries: int =
                 "outputsize": outputsize,
                 "apikey": TWELVE_DATA_API_KEY,
                 "format": "JSON",
-                "exchange": "NASDAQ"
             }
             response = requests.get(url, params=params, timeout=15)
             data = response.json()
- 
-            if data.get("status") == "error":
-                # Try without exchange restriction
-                params.pop("exchange")
-                response = requests.get(url, params=params, timeout=15)
-                data = response.json()
  
             if data.get("status") == "error":
                 print(f"[ERROR] API error for {symbol}: {data.get('message')}")
@@ -204,7 +208,7 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
  
 def get_raw_dataframe(symbol: str, period: str = "2y") -> pd.DataFrame:
     try:
-        df = fetch_with_retry(symbol, period, "1d")
+        df = fetch_with_retry(symbol, period, "1day")
         return df if df is not None else pd.DataFrame()
     except Exception as e:
         print(f"Error fetching raw data: {e}")
